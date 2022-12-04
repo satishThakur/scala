@@ -22,6 +22,9 @@ object Main extends App:
   import Example.*
   println("hello")
 
+  val StringEither : Wrapper[Either[String,_]] = rtEither[String]
+  
+
 
 
 

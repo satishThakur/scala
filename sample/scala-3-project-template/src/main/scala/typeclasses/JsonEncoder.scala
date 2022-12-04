@@ -16,6 +16,7 @@ object JsonEncoder:
   given boolEncoder: JsonEncoder[Boolean] with
     override def encode(t: Boolean): String = t.toString
 
+  //Extending a new type with existing type was main usecase for implicit def in Scala 2 (got largely misused too..)
   given listEncoder[T](using JsonEncoder[T]): JsonEncoder[List[T]] with
     override def encode(ts: List[T]): String = ts.map(_.toJson).mkString("[", ",", "]")
 

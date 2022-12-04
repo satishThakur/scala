@@ -16,6 +16,14 @@ object RNG:
     val (i, r1) = r.nextInt
     (i %2 ==0, r1)
 
+  //Problem -->
+  def boolTuple(r: RNG) : ((Boolean, Boolean), RNG) =
+    val (i, r1) = r.nextInt
+    val first = i %2 == 0
+    val (i1, r2) = r1.nextInt
+    val second = i1 % 2 == 0
+    ((first, second), r2)
+
   def nonNegativeInt(rng: RNG): (Int, RNG) =
     val (i, r) = rng.nextInt
     (if i < 0 then -(i + 1) else i, r)
@@ -30,6 +38,8 @@ type Rand[+A] = State[RNG, A]
 object Rand:
   def int: Rand[Int] = State(_.nextInt)
   def bool: Rand[Boolean] = State(rng => RNG.bool(rng))
+
+
 
 
 /**
@@ -92,7 +102,7 @@ case class State[S, +A](run: S => (A,S)):
 object State{
 
   //defines a State from single value. The state transition function always return same value.
-  //State is ignored.
+  //State is ignored. But we still have th state which can be used in get/set
   def unit[S, A](a: A): State[S, A] = State(s => (a, s))
 
   //we have N state transition function for the domain A. here we compose a STF which
@@ -128,11 +138,11 @@ object State{
    */
   def set[S](s: S): State[S, Unit] = State(_ => ((), s))
 
-  def modify1[S](f: S => S): State[S,Unit] = get.flatMap(s => set(s))
+  def modify1[S](f: S => S): State[S,Unit] = get.flatMap(s => set(f(s)))
 
   def modify[S](f: S => S): State[S,Unit] = for{
     s <- get
-    x <- set(s)
+    x <- set(f(s))
   } yield x
 
 }
@@ -174,7 +184,7 @@ object Candy:
     //lets simplify - applyInput_ is of type - Input => (S=>S)
     //modidy is of type - (S=>S) => State[Machine,Unit]. This is typical function composition
     // g(f(a)) = (f o g)(a)
-    val composedFunc: (Input => State[Machine,Unit]) = modify[Machine] _ compose applyInput
+    val composedFunc: (Input => State[Machine,Unit]) = modify[Machine]  compose applyInput
     for{
       fs <- sequence(inputs.map(composedFunc))
       m <- get
@@ -182,5 +192,17 @@ object Candy:
 
 
 object Main extends App {
+  import State.{get,set}
 
+  def zipIndex[A](ls : List[A]) : List[(Int,A)] =
+    val stf = ls.foldLeft(State.unit[Int, List[(Int, A)]](List()))(
+      (acc, a) => for{
+        xs <- acc
+        n <- get
+        _ <- set(n + 1)
+      }yield (n, a) :: xs
+    )
+    stf.run(0)._1.reverse
+
+  println(zipIndex((0 to 100000).toList))
 }

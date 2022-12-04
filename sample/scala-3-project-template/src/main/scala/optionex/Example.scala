@@ -18,9 +18,11 @@ class DB:
 
 object Example extends App:
   def getLocation(db: DB, personId: Int): Location =
-    (for{
+    val deptLocation = for{
       p <- db.getPerson(personId)
       d <- db.getDept(p)
       l <- db.deptLocation(d)
-    } yield l).getOrElse(Location.defLoc)
+    } yield l
+
+    deptLocation.getOrElse(Location.defLoc)
 

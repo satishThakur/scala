@@ -37,9 +37,11 @@ object Monoid:
     override def zero: A => A = identity
     override def op(a1: A => A, a2: A => A): A => A = a => a2(a1(a))
 
+  //10.5
   def foldMap[A,B](a: List[A], m: Monoid[B])(f: A => B): B =
     a.foldLeft(m.zero)((b, a) => m.op(b, f(a)))
 
+  //10.6 - TODO revisit.
   def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
     val m: Monoid[B => B] = endoMonoid[B]
     foldMap(as, m)(f.curried)(z)
@@ -59,6 +61,7 @@ object Monoid:
     }
   }
 
+  //10.7 -
   def foldMapV[A,B](v: IndexedSeq[A], m: Monoid[B])(f: A => B): B =
     if v.size == 0 then m.zero else if v.size == 1 then f(v(0))
     else
@@ -78,7 +81,13 @@ object Monoid:
   def productMonoid[A,B](a: Monoid[A], b: Monoid[B]): Monoid[(A,B)] = new Monoid[(A,B)] {
     def zero: (A,B) = (a.zero, b.zero)
     def op(o1: (A,B), o2: (A,B)): (A,B) =
-      (a.op(o1(0), o1(0)), b.op(o1(1), o2(1)))
+      (a.op(o1(0), o2(0)), b.op(o1(1), o2(1)))
+  }
+
+  def functionMonoid[A,B](m : Monoid[B]): Monoid[A => B] = new Monoid[A => B] {
+    def zero: A => B = _ => m.zero
+    def op(f1: A => B, f2: A => B): A => B =
+      a => m.op(f1(a), f2(a))
   }
 
   sealed trait WC
@@ -109,88 +118,93 @@ object Monoid:
 trait Foldable[F[_]]:
   import Monoid.*
   //foldRight
-  def foldRight[A,B](fa: F[A])(zero: B)(f: (A,B) => B): B =
-    foldMap(fa)(endoMonoid[B])(f.curried)(zero)
-
+  extension[A](fa: F[A])
+    def foldRight[B](zero: B)(f: (A,B) => B): B =
+      fa.foldMap(f.curried)(using endoMonoid[B])(zero)
   //foldLeft
-  def foldLeft[A,B](fa: F[A])(zero: B)(f: (B,A) => B): B =
-    foldMap(fa)(dual(endoMonoid[B]))(a => b => f(b,a))(zero)
+    def foldLeft[B](zero: B)(f: (B,A) => B): B =
+      fa.foldMap(a => b => f(b,a))(using dual(endoMonoid[B]))(zero)
 
-  def foldMap[A,B](fa: F[A])(m: Monoid[B])(f: A => B): B =
-    foldLeft(fa)(m.zero)((b, a) => m.op(b, f(a)))
+    def foldMap[B](f: A => B)(using m: Monoid[B]): B =
+      fa.foldLeft(m.zero)((b, a) => m.op(b, f(a)))
 
-  def toList[A](as: F[A]): List[A] =
-    foldRight[A,List[A]](as)(Nil)(_ :: _)
+    def toList: List[A] =
+      fa.foldRight[List[A]](Nil)(_ :: _)
 
-object ListFoldable extends Foldable[List]:
-  override def foldRight[A, B](fa: List[A])(zero: B)(f: (A, B) => B): B =
-    fa.foldRight(zero)(f)
-  override def foldLeft[A,B](fa: List[A])(zero: B)(f: (B,A) => B): B =
-    fa.foldLeft(zero)(f)
-  override def toList[A](as: List[A]): List[A] = as
+given ListFoldable: Foldable[List] with
+  extension[A](fa: List[A])
+    override def foldRight[B](zero: B)(f: (A, B) => B): B =
+      fa.foldRight(zero)(f)
+    override def foldLeft[B](zero: B)(f: (B,A) => B): B =
+      fa.foldLeft(zero)(f)
+    override def toList: List[A] = fa
 
-object IndexedSeqFoldable extends Foldable[IndexedSeq]:
+given IndexedSeqFoldable: Foldable[IndexedSeq] with
   import Monoid.foldMapV
 
-  override def foldRight[A, B](fa: IndexedSeq[A])(zero: B)(f: (A, B) => B): B =
-    fa.foldRight(zero)(f)
+  extension[A](fa: IndexedSeq[A])
+    override def foldRight[B](zero: B)(f: (A, B) => B): B =
+      fa.foldRight(zero)(f)
 
-  override def foldLeft[A,B](fa: IndexedSeq[A])(zero: B)(f: (B,A) => B): B =
-    fa.foldLeft(zero)(f)
+    override def foldLeft[B](zero: B)(f: (B,A) => B): B =
+      fa.foldLeft(zero)(f)
 
-  override def foldMap[A,B](fa: IndexedSeq[A])(m: Monoid[B])(f: A => B): B =
-    foldMapV(fa, m)(f)
+    override def foldMap[B](f: A => B)(using m: Monoid[B]): B =
+      foldMapV(fa, m)(f)
 
-  override def toList[A](as: IndexedSeq[A]): List[A] = as.toList
+    override def toList: List[A] = fa.toList
 
-object LazyListFoldable extends Foldable[LazyList]:
-  override def foldRight[A, B](fa: LazyList[A])(zero: B)(f: (A, B) => B): B =
-    fa.foldRight(zero)(f)
-  override def foldLeft[A,B](fa: LazyList[A])(zero: B)(f: (B,A) => B): B =
-    fa.foldLeft(zero)(f)
+given LazyListFoldable: Foldable[LazyList] with
+  extension[A](fa: LazyList[A])
+    override def foldRight[B](zero: B)(f: (A, B) => B): B =
+      fa.foldRight(zero)(f)
+    override def foldLeft[B](zero: B)(f: (B,A) => B): B =
+      fa.foldLeft(zero)(f)
 
 
 sealed trait Tree[+A]
 case class Leaf[A](value: A) extends Tree[A]
 case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
 
-object TreeFoldable extends Foldable[Tree]:
-  override def foldLeft[A,B](fa: Tree[A])(zero: B)(f: (B,A) => B): B = fa match {
-    case Leaf(v) => f(zero, v)
-    case Branch(l, r) =>
-      val rightReduced = foldLeft(r)(zero)(f)
-      foldLeft(l)(rightReduced)(f)
-  }
+given TreeFoldable: Foldable[Tree] with
+  extension[A](fa: Tree[A])
+    override def foldLeft[B](zero: B)(f: (B,A) => B): B = fa match {
+      case Leaf(v) => f(zero, v)
+      case Branch(l, r) =>
+        val rightReduced = r.foldLeft(zero)(f)
+        l.foldLeft(rightReduced)(f)
+    }
 
   //does not use m.zero...
-  override def foldMap[A,B](fa: Tree[A])(m: Monoid[B])(f: A => B): B = fa match {
-    case Leaf(v) => f(v)
-    case Branch(l, r) => m.op(foldMap(l)(m)(f), foldMap(r)(m)(f))
-  }
+    override def foldMap[B](f: A => B)(using m: Monoid[B]): B = fa match {
+      case Leaf(v) => f(v)
+      case Branch(l, r) => m.op(l.foldMap(f), r.foldMap(f))
+    }
 
-  override def foldRight[A,B](fa: Tree[A])(zero: B)(f: (A,B) => B): B = fa match {
-    case Leaf(v) => f(v, zero)
-    case Branch(l , r) =>
-      val rightReduced = foldRight(r)(zero)(f)
-      foldRight(l)(rightReduced)(f)
-  }
+    override def foldRight[B](zero: B)(f: (A,B) => B): B = fa match {
+      case Leaf(v) => f(v, zero)
+      case Branch(l , r) =>
+        val rightReduced = r.foldRight(zero)(f)
+        l.foldRight(rightReduced)(f)
+    }
 
 
-object OptionFoldable extends Foldable[Option]:
-  override def foldRight[A,B](fa: Option[A])(zero: B)(f: (A,B) => B): B = fa match {
-    case None => zero
-    case Some(a) => f(a,zero)
-  }
+given OptionFoldable: Foldable[Option] with
+  extension[A](fa: Option[A])
+    override def foldRight[B](zero: B)(f: (A,B) => B): B = fa match {
+      case None => zero
+      case Some(a) => f(a,zero)
+    }
 
   //foldLeft
-  override def foldLeft[A,B](fa: Option[A])(zero: B)(f: (B,A) => B): B = fa match {
-    case None => zero
-    case Some(a) => f(zero, a)
-  }
+    override def foldLeft[B](zero: B)(f: (B,A) => B): B = fa match {
+      case None => zero
+      case Some(a) => f(zero, a)
+    }
 
-  override def foldMap[A,B](fa: Option[A])(m: Monoid[B])(f: A => B): B = fa match {
-    case None => m.zero
-    case Some(a) => f(a)
+    override def foldMap[B](f: A => B)(using m: Monoid[B]): B = fa match {
+      case None => m.zero
+      case Some(a) => f(a)
   }
 
 

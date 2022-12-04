@@ -31,6 +31,7 @@ trait MyStream[+A]:
   }
 
   def #::[B >: A](element: =>B): MyStream[B] = cons(element, this)
+  
   def ++[B >: A](another: => MyStream[B]): MyStream[B] = this match {
     case Empty => another
     case Cons(h, t) => cons(h(), t() ++ another)
@@ -77,7 +78,7 @@ object MyStream{
       case None => Empty
     }
 
-  def from[A](start: =>A, gen: A => A): MyStream[A] = {
+  def from[A](start: => A, gen: A => A): MyStream[A] = {
     unfold(start)(x => Some((x, gen(x))))
   }
 
