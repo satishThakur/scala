@@ -1,0 +1,5 @@
+package optionex
+
+class MyOption {
+
+}

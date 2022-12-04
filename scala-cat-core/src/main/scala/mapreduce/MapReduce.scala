@@ -1,0 +1,5 @@
+package mapreduce
+
+class MapReduce {
+
+}

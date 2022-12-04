@@ -1,0 +1,5 @@
+package tlambda
+
+object Simple {
+
+}

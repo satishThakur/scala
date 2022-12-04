@@ -1,0 +1,3 @@
+package practise trait Applicative {
+
+}
