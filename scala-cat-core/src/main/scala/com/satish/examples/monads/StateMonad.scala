@@ -1,5 +1,4 @@
 package com.satish.examples.monads
 
-class StateMonad {
-
-}
+object StateMonad extends App:
+  import cats.data.State

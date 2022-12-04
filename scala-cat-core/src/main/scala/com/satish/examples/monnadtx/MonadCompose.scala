@@ -1,5 +1,3 @@
 package com.satish.examples.monnadtx
 
-class MonadCompose {
-
-}
+object MonadCompose

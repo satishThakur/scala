@@ -1,5 +1,6 @@
 package com.satish.examples.refined
 
-object Simple {
 
-}
+object Simple extends App:
+  println("satish")
+
